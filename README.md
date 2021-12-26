@@ -31,6 +31,8 @@ git clone https://github.com/adotrdot/bstation-cli.git
 ==============================
 
 - The development of this program is for educational purpose.
+- This program was written from scratch, but was heavily inspired by [ani-cli](https://github.com/pystardust/ani-cli)
 - I don't support piracy, thus I won't add a download feature.
-- Currently, video quality is maxed at 480p because one needs to have an account at Bilibili to access a quality higher than that, and subtitle is not yet available when watching.
+- Currently, video quality is maxed at 480p and some shows aren't accessible because one needs to have an account at Bilibili to access those.
+- Converting subtitle might take a while.
 - Be warned that this code is still messy. I haven't written any comments, and such.
