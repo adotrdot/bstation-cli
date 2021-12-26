@@ -1,0 +1,102 @@
+#!/bin/sh
+
+tmp="$PWD/.bstation-cli_tmp"
+session_tmp="$PWD/.bstation-cli_session"
+session=""
+query=""
+anime_id=""
+episode_id=""
+
+get_session() {
+    if [ -f "$session_tmp" ]; then
+        session=`sed -n 5p "$session_tmp" | sed 's/.*buvid3\t//'`
+    else
+        curl -c "$session_tmp" -s "https://www.bilibili.tv" > /dev/null
+        session=`sed -n 5p "$session_tmp" | sed 's/.*buvid3\t//'`
+    fi
+}
+
+search_anime() {
+    curl -s "https://api.bilibili.tv/intl/gateway/web/v2/search?buvid=$session&keyword=$query&platform=web&pn=1&ps=20&qid=&s_locale=en_US&timezone=GMT%2B07" \
+        | sed 's/^.*"module":"ogv",//;s/,{"module":"ugc",.*$//' \
+        | sed 's/,/,\n/g' | grep "{\"title\":\|\"season_id\"" \
+        | sed 's/"items":\[//' > "$tmp"
+}
+
+get_episode() {
+    total_episode=`cat "$tmp" | wc -l`
+    selected_episode=0
+    echo -n "Choose episode [1-$total_episode]: "
+    read selected_episode
+    if [[ $selected_episode -gt 0 && $selected_episode -le $total_episode ]]; then
+        episode_id=`sed -n ${selected_episode}p "$tmp"`
+    else
+        echo "Invalid number."
+    fi
+}
+
+watch_anime() {
+    curl -s "https://api.bilibili.tv/intl/gateway/web/playurl?buvid=$session&device=wap&ep_id=$episode_id&platform=web&qn=64&s_locale=en_US&tf=0&timezone=GMT%2B07&type=0" > "$tmp"
+
+    video_url=`sed 's/480P.*$//;s/^.*720P.*\"url\"//' "$tmp" \
+        | cut -d\" -f 2 \
+        | sed 's/\\\u0026/\&/g'`
+
+    audio_url=`sed 's/^.*\"audio_resource\"//;s/^.*30216.*\"url\"//' "$tmp" \
+        | cut -d\" -f 2 \
+        | sed 's/\\\u0026/\&/g'`
+
+    #curl -s "https://api.bilibili.tv/intl/gateway/web/v2/subtitle?buvid=$session&episode_id=$episode_id&platform=web&s_locale=en_US&timezone=GMT%2B07" > "$tmp"
+
+    #sub_url=`sed 's/\"English\",.*$//;s/^.*\"url\"//' "$tmp" \
+     #   | cut -d\" -f 2`
+
+    mpv "$video_url" --audio-file="$audio_url" > /dev/null 2>&1 #--sub-file="$sub_url"
+}
+
+######
+# MAIN
+######
+
+get_session
+
+tmp_query=""
+echo -n "Search Anime: "
+read tmp_query
+echo $tmp_query > "$tmp"
+query=`sed 's/\ /\+/g' "$tmp"`
+
+search_anime
+
+title_num=1
+list_num=1
+selected_anime=0
+title=`sed -n ${title_num}p "$tmp"`
+
+if [ -z "$title" ]; then
+    echo "No result."
+else
+    while [ -n "$title" ]; do
+        echo -n "[$list_num] "
+        sed -n ${title_num}p "$tmp" | cut -d\" -f 4 | sed 's/^\ *//'
+        (( list_num += 1 ))
+        (( title_num += 2 ))
+        title=`sed -n ${title_num}p "$tmp"`
+    done
+    
+    echo -n "Enter number: "
+    read selected_anime
+    if [[ $selected_anime -gt 0 && $selected_anime -lt $list_num ]]; then
+        (( selected_anime *= 2 ))
+        anime_id=`sed -n ${selected_anime}p "$tmp" | cut -d: -f 2 | sed 's/,//'`
+        curl -b "$session_tmp" -s "https://www.bilibili.tv/en/play/$anime_id" \
+            | grep "^.*active\"><a href=\"/en/play/$anime_id/.*\"\|^.*card\"><a href=\"/en/play/$anime_id/.*\"" \
+            | sed "s/^.*\/en\/play\/$anime_id\///;s/\".*$//" > "$tmp"
+        get_episode
+        watch_anime
+    else
+        echo "Invalid number."
+    fi
+fi
+
+rm -f "$tmp"
