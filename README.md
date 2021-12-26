@@ -24,8 +24,8 @@ git clone https://github.com/adotrdot/bstation-cli.git
 ## Usage
 ==============================
 
-Inside the directory, run:
-``./bstation-cli``
+1. Set execute permission to the program by running `chmod +x` on it
+1. Inside the directory, run: `./bstation-cli`
 
 ## Misc
 ==============================
