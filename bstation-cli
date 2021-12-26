@@ -71,7 +71,7 @@ convert_sub() {
 
         if [ $to_secs -ge 3600 ]; then
             to_hrs=$(( $to_secs / 3600 ))
-            if [ $to_hrs -ge 1 ] && [ $to -le 9 ]; then
+            if [ $to_hrs -ge 1 ] && [ $to_hrs -le 9 ]; then
                 to_hrs=0$to_hrs
             fi
             to_secs=$(( $to_secs % 3600 ))
