@@ -3,6 +3,8 @@
 tmp="$PWD/.bstation-cli_tmp"
 session_tmp="$PWD/.bstation-cli_session"
 session=""
+sub_tmp="$PWD/.subtitle.bcc"
+sub_path="$PWD/.subtitle.srt"
 query=""
 anime_id=""
 episode_id=""
@@ -35,6 +37,68 @@ get_episode() {
     fi
 }
 
+convert_sub() {
+    total_lines=`sed 's/^.*:\[//;s/},/\n/g' "$sub_tmp" | wc -l`
+    total_lines=$(( total_lines += 1 ))
+    curr_line=1
+
+    while [ $curr_line -le $total_lines ]; do
+        from_msecs=`sed 's/^.*:\[//;s/},/\n/g' "$sub_tmp" | sed -n ${curr_line}p | sed 's/^.*from\"://;s/,\"to.*$//;s/^.*\.//'`
+        from_secs=`sed 's/^.*:\[//;s/},/\n/g' "$sub_tmp" | sed -n ${curr_line}p | sed 's/^.*from\"://;s/,\"to.*$//;s/\..*$//'`
+
+        if [ $from_secs -ge 3600 ]; then
+            from_hrs=$(( $from_secs / 3600 ))
+            if [ $from_hrs -ge 1 ] && [ $from_hrs -le 9 ]; then
+                from_hrs=0$from_hrs
+            fi
+            from_secs=$(( $from_secs % 3600 ))
+        else
+            from_hrs=00
+        fi
+
+        if [ $from_secs -ge 60 ]; then
+            from_mins=$(( $from_secs / 60 ))
+            if [ $from_mins -ge 1 ] && [ $from_mins -le 9 ]; then
+                from_mins=0$from_mins
+            fi
+            from_secs=$(( $from_secs % 60 ))
+        else
+            from_mins=00
+        fi
+
+        to_msecs=`sed 's/^.*:\[//;s/},/\n/g' "$sub_tmp" | sed -n ${curr_line}p | sed 's/^.*to\"://;s/,.*$//;s/^.*\.//'`
+        to_secs=`sed 's/^.*:\[//;s/},/\n/g' "$sub_tmp" | sed -n ${curr_line}p | sed 's/^.*to\"://;s/,.*$//;s/\..*$//'`
+
+        if [ $to_secs -ge 3600 ]; then
+            to_hrs=$(( $to_secs / 3600 ))
+            if [ $to_hrs -ge 1 ] && [ $to -le 9 ]; then
+                to_hrs=0$to_hrs
+            fi
+            to_secs=$(( $to_secs % 3600 ))
+        else
+            to_hrs=00
+        fi
+
+        if [ $to_secs -ge 60 ]; then
+            to_mins=$(( $to_secs / 60 ))
+            if [ $to_mins -ge 1 ] && [ $to_mins -le 9 ]; then
+                to_mins=0$to_mins
+            fi
+            to_secs=$(( $to_secs % 60 ))
+        else
+            to_mins=00
+        fi
+
+        echo $curr_line >> "$sub_path"
+        echo ${from_hrs}:${from_mins}:${from_secs},${from_msecs} \-\-\> ${to_hrs}:${to_mins}:${to_secs},${to_msecs} >> "$sub_path"
+
+        sed 's/^.*:\[//;s/},/\n/g' "$sub_tmp" | sed -n ${curr_line}p | sed 's/^.*content\":\"//;s/\"$//;s/\\n/\n/g;s/\\//g;s/u003ciu003e//g;s/u003c\/iu003e//g' >> "$sub_path"
+        
+        echo >> "$sub_path"
+        curr_line=$(( curr_line += 1 ))
+    done
+}
+
 watch_anime() {
     curl -s "https://api.bilibili.tv/intl/gateway/web/playurl?buvid=$session&device=wap&ep_id=$episode_id&platform=web&qn=64&s_locale=en_US&tf=0&timezone=GMT%2B07&type=0" > "$tmp"
 
@@ -46,12 +110,17 @@ watch_anime() {
         | cut -d\" -f 2 \
         | sed 's/\\\u0026/\&/g'`
 
-    #curl -s "https://api.bilibili.tv/intl/gateway/web/v2/subtitle?buvid=$session&episode_id=$episode_id&platform=web&s_locale=en_US&timezone=GMT%2B07" > "$tmp"
+    curl -s "https://api.bilibili.tv/intl/gateway/web/v2/subtitle?buvid=$session&episode_id=$episode_id&platform=web&s_locale=en_US&timezone=GMT%2B07" > "$tmp"
 
-    #sub_url=`sed 's/\"English\",.*$//;s/^.*\"url\"//' "$tmp" \
-     #   | cut -d\" -f 2`
+    sub_url=`sed 's/\"English\",.*$//;s/^.*\"url\"//' "$tmp" \
+        | cut -d\" -f 2`
 
-    mpv "$video_url" --audio-file="$audio_url" > /dev/null 2>&1 #--sub-file="$sub_url"
+    curl -s "$sub_url" > "$sub_tmp"
+
+    echo "Converting subtitle..."
+    rm -f "$sub_path"; convert_sub
+    echo "Playing..."
+    mpv "$video_url" --audio-file="$audio_url" --sub-file="$sub_path" --sub-font-size=32 > /dev/null 2>&1 
 }
 
 ######
@@ -100,3 +169,5 @@ else
 fi
 
 rm -f "$tmp"
+rm -f "$sub_tmp"
+rm -f "$sub_path"
