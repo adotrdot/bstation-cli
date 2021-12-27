@@ -1,10 +1,11 @@
 #!/bin/sh
 
-tmp="$PWD/.bstation-cli_tmp"
-session_tmp="$PWD/.bstation-cli_session"
+tmp="$PWD/.bstation-cli.tmp"
+session_tmp="$PWD/.bstation-cli.session"
 session=""
 sub_tmp="$PWD/.subtitle.bcc"
 sub_path="$PWD/.subtitle.srt"
+ep_tmp="$PWD/.episode-list.tmp"
 query=""
 anime_id=""
 episode_id=""
@@ -26,12 +27,12 @@ search_anime() {
 }
 
 get_episode() {
-    total_episode=`cat "$tmp" | wc -l`
+    total_episode=`cat "$ep_tmp" | wc -l`
     selected_episode=0
     echo -n "Choose episode [1-$total_episode]: "
     read selected_episode
     if [ $selected_episode -gt 0 ] && [ $selected_episode -le $total_episode ]; then
-        episode_id=`sed -n ${selected_episode}p "$tmp"`
+        episode_id=`sed -n ${selected_episode}p "$ep_tmp"`
     else
         echo "Invalid number."
     fi
@@ -92,7 +93,7 @@ convert_sub() {
         echo $curr_line >> "$sub_path"
         echo ${from_hrs}:${from_mins}:${from_secs},${from_msecs} \-\-\> ${to_hrs}:${to_mins}:${to_secs},${to_msecs} >> "$sub_path"
 
-        sed 's/^.*:\[//;s/},/\n/g' "$sub_tmp" | sed -n ${curr_line}p | sed 's/^.*content\":\"//;s/\"$//;s/\\n/\n/g;s/\\//g;s/u003ciu003e//g;s/u003c\/iu003e//g' >> "$sub_path"
+        sed 's/^.*:\[//;s/},/\n/g' "$sub_tmp" | sed -n ${curr_line}p | sed 's/^.*content\":\"//;s/\"$//;s/\\n/\n/g;s/\\//g;s/u003ciu003e//g;s/u003c\/iu003e//g;s/}\]}//' >> "$sub_path"
         
         echo >> "$sub_path"
         curr_line=$(( curr_line += 1 ))
@@ -158,9 +159,11 @@ else
     if [ $selected_anime -gt 0 ] && [ $selected_anime -lt $list_num ]; then
         selected_anime=$(( selected_anime *= 2 ))
         anime_id=`sed -n ${selected_anime}p "$tmp" | cut -d: -f 2 | sed 's/,//'`
-        curl -b "$session_tmp" -s "https://www.bilibili.tv/en/play/$anime_id" \
-            | grep "^.*active\"><a href=\"/en/play/$anime_id/.*\"\|^.*card\"><a href=\"/en/play/$anime_id/.*\"" \
-            | sed "s/^.*\/en\/play\/$anime_id\///;s/\".*$//" > "$tmp"
+        sed "9 s/\".*\"/\"https:\/\/www\.bilibili\.tv\/en\/play\/$anime_id\"/" "script_template.py" > "script.py"
+        echo "Getting episode list..."
+        python script.py > /dev/null
+        grep "^.*active\"><a href=\"/en/play/$anime_id/.*\"\|^.*card\"><a href=\"/en/play/$anime_id/.*\"" "$tmp" \
+            | sed "s/^.*\/en\/play\/$anime_id\///;s/\".*$//" > "$ep_tmp"
         get_episode
         watch_anime
     else
@@ -171,3 +174,5 @@ fi
 rm -f "$tmp"
 rm -f "$sub_tmp"
 rm -f "$sub_path"
+rm -f "$ep_tmp"
+rm -f "script.py"
