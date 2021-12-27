@@ -1,4 +1,6 @@
-.bstation-cli_tmp
-.bstation-cli_session
+.bstation-cli.tmp
+.bstation-cli.session
 .subtitle.bcc
 .subtitle.srt
+.script.py
+geckodriver.log
