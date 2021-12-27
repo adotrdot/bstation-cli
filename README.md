@@ -27,7 +27,7 @@ git clone https://github.com/adotrdot/bstation-cli.git
 
 1. Install selenium (if hasn't) by running `python pip install selenium`
 1. Install firefox (if hasn't)
-1. Set up geckodriver, follow the guide [here](https://www.selenium.dev/documentation/webdriver/getting_started/install_drivers/")
+1. Set up geckodriver, follow the guide [here](https://www.selenium.dev/documentation/webdriver/getting_started/install_drivers/)
 1. Give execute permission to the program by running `chmod +x` on it
 1. Run `./bstation-cli`
 
