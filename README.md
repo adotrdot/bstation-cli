@@ -35,7 +35,7 @@ git clone https://github.com/adotrdot/bstation-cli.git
 ==============================
 
 - The development of this program is for educational purpose.
-- This program was written from scratch, but was heavily inspired by [ani-cli](https://github.com/pystardust/ani-cli)
+- This program was written from scratch, but was heavily inspired by [ani-cli](https://github.com/pystardust/ani-cli).
 - I don't support piracy, thus I won't add a download feature.
 - Currently, video quality is maxed at 480p and some shows aren't accessible because one needs to have an account at Bilibili to access those.
 - Getting episode list might take a while. This is because of a page functionality that hides some episodes, thus requires using selenium to click some buttons first. It's a bit overwhelming to use selenium just for getting the episode list, but I haven't found any other solution.
