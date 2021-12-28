@@ -1,7 +1,2 @@
-.bstation-cli.tmp
-.bstation-cli.session
-.episode-list.tmp
-.subtitle.bcc
-.subtitle.srt
-.script.py
+.*
 geckodriver.log
