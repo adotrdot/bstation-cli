@@ -65,7 +65,7 @@ get_episode() {
 
 convert_sub() {
     # Bilibili has a unique format for subtitle, you can try to see it yourself to better understand what I meant.
-    # I didn't know what the extension really is, I thought it was .bcc but maybe I was wrong.
+    # I didn't know what the extension really was, I thought it was .bcc but maybe I was wrong.
     # I made this conversion method mainly using sed to edit the subtitle so it matches the .srt sample I found on the internet.
 
     # Maybe it will make the watching experience better if this conversion can be done in real-time while watching,
@@ -176,7 +176,7 @@ watch_anime() {
 
 main() {
     # This function will ask the user for search query,
-    # call the search_anime fucntion,
+    # call the search_anime procedure,
     # display the search results,
     # asks the user to select a title,
     # gets its episode list using python + selenium webdriver
