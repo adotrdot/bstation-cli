@@ -11,41 +11,74 @@ anime_id=""
 episode_id=""
 
 get_session() {
-    if [ -f "$session_tmp" ]; then
-        session=`sed -n 5p "$session_tmp" | sed 's/.*buvid3\t//'`
-    else
-        curl -c "$session_tmp" -s "https://www.bilibili.tv" > /dev/null
-        session=`sed -n 5p "$session_tmp" | sed 's/.*buvid3\t//'`
-    fi
+    # The better term for this is, maybe, get_cookies.
+    # But session just sounded cooler, and its meaning didn't stray so far off.
+
+    # If .bstation-cli.session doesn't exist, get cookies and write them to it.
+    [ -n "$session_tmp" ] && curl -c "$session_tmp" -s "https://www.bilibili.tv" > /dev/null
+        
+    # Get the unique buvid3 from .bstation-cli.session,
+    # This will be needed for search_anime and watch_anime procedures.
+    session=`sed -n 5p "$session_tmp" | sed 's/.*buvid3\t//'`
 }
 
 search_anime() {
+    # As the name of the function suggests, search for anime in the bilibili.tv database.
+    # Do some stream editing, and finally write the result to .bstation-cli.tmp
+
     curl -s "https://api.bilibili.tv/intl/gateway/web/v2/search?buvid=$session&keyword=$query&platform=web&pn=1&ps=20&qid=&s_locale=en_US&timezone=GMT%2B07" \
         | sed 's/^.*"module":"ogv",//;s/,{"module":"ugc",.*$//' \
         | sed 's/,/,\n/g' | grep "{\"title\":\|\"season_id\"" \
         | sed 's/"items":\[//' > "$tmp"
 }
 
+choose_sub() {
+    # Blatantly asks for choice of language for the subtitle.
+    # This was a risky move, because there will probably be some shows that doesn't have Eng/Ind subtitle.
+    # But I thought that those shows are becoming less and less now that I don't want to care.
+
+    echo "Choose subtitle:"
+    echo "[1] English"
+    echo "[2] Bahasa Indonesia"
+    echo -n "Enter number: "
+    read sub_opt
+    
+    if [ $sub_opt -eq 1 ]; then
+        sub_opt="English"
+    elif [ $sub_opt -eq 2 ]; then
+        sub_opt="Bahasa Indonesia"
+    fi
+}
+
 get_episode() {
-    total_episode=`cat "$ep_tmp" | wc -l`
-    selected_episode=0
-    echo -n "Choose episode [1-$total_episode]: "
-    read selected_episode
-    if [ $selected_episode -gt 0 ] && [ $selected_episode -le $total_episode ]; then
-        episode_id=`sed -n ${selected_episode}p "$ep_tmp"`
+    # Asks the user to select an episode.
+
+    total_ep=`cat "$ep_tmp" | wc -l`
+    echo -n "Choose episode [1-$total_ep]: "
+    read selected_ep
+    if [ $selected_ep -gt 0 ] && [ $selected_ep -le $total_ep ]; then
+        episode_id=`sed -n ${selected_ep}p "$ep_tmp"`
     else
         echo "Invalid number."
     fi
 }
 
 convert_sub() {
-    total_lines=`sed 's/^.*:\[//;s/},/\n/g' "$sub_tmp" | wc -l`
+    # Bilibili has a unique format for subtitle, you can try to see it yourself to better understand what I meant.
+    # I didn't know what the extension really is, I thought it was .bcc but maybe I was wrong.
+    # I made this conversion method mainly using sed to edit the subtitle so it matches the .srt sample I found on the internet.
+
+    # Maybe it will make the watching experience better if this conversion can be done in real-time while watching,
+    # but I don't know how to do it.
+
+    sed 's/^.*:\[//;s/},/\n/g' "$tmp" > "$sub_tmp"
+    total_lines=`cat "$sub_tmp" | wc -l`
     total_lines=$(( total_lines += 1 ))
     curr_line=1
 
     while [ $curr_line -le $total_lines ]; do
-        from_msecs=`sed 's/^.*:\[//;s/},/\n/g' "$sub_tmp" | sed -n ${curr_line}p | sed 's/^.*from\"://;s/,\"to.*$//;s/^.*\.//'`
-        from_secs=`sed 's/^.*:\[//;s/},/\n/g' "$sub_tmp" | sed -n ${curr_line}p | sed 's/^.*from\"://;s/,\"to.*$//;s/\..*$//'`
+        from_msecs=`cat "$sub_tmp" | sed -n ${curr_line}p | sed 's/^.*from\"://;s/,\"to.*$//;s/^.*\.//'`
+        from_secs=`cat "$sub_tmp" | sed -n ${curr_line}p | sed 's/^.*from\"://;s/,\"to.*$//;s/\..*$//'`
 
         if [ $from_secs -ge 3600 ]; then
             from_hrs=$(( $from_secs / 3600 ))
@@ -67,8 +100,8 @@ convert_sub() {
             from_mins=00
         fi
 
-        to_msecs=`sed 's/^.*:\[//;s/},/\n/g' "$sub_tmp" | sed -n ${curr_line}p | sed 's/^.*to\"://;s/,.*$//;s/^.*\.//'`
-        to_secs=`sed 's/^.*:\[//;s/},/\n/g' "$sub_tmp" | sed -n ${curr_line}p | sed 's/^.*to\"://;s/,.*$//;s/\..*$//'`
+        to_msecs=`cat "$sub_tmp" | sed -n ${curr_line}p | sed 's/^.*to\"://;s/,.*$//;s/^.*\.//'`
+        to_secs=`cat "$sub_tmp" | sed -n ${curr_line}p | sed 's/^.*to\"://;s/,.*$//;s/\..*$//'`
 
         if [ $to_secs -ge 3600 ]; then
             to_hrs=$(( $to_secs / 3600 ))
@@ -93,7 +126,7 @@ convert_sub() {
         echo $curr_line >> "$sub_path"
         echo ${from_hrs}:${from_mins}:${from_secs},${from_msecs} \-\-\> ${to_hrs}:${to_mins}:${to_secs},${to_msecs} >> "$sub_path"
 
-        sed 's/^.*:\[//;s/},/\n/g' "$sub_tmp" | sed -n ${curr_line}p | sed 's/^.*content\":\"//;s/\"$//;s/\\n/\n/g;s/\\//g;s/u003ciu003e//g;s/u003c\/iu003e//g;s/}\]}//' >> "$sub_path"
+        cat "$sub_tmp" | sed -n ${curr_line}p | sed 's/^.*content\":\"//;s/\"$//;s/\\n/\n/g;s/\\//g;s/u003ciu003e//g;s/u003c\/iu003e//g;s/}\]}//' >> "$sub_path"
         
         echo >> "$sub_path"
         curr_line=$(( curr_line += 1 ))
@@ -101,76 +134,168 @@ convert_sub() {
 }
 
 watch_anime() {
+    # Get the video, audio, and subtitle data,
+    # and play them in mpv.
+
+    # Reset screen
+    tput reset
+
+    echo "Getting episode data..."
     curl -s "https://api.bilibili.tv/intl/gateway/web/playurl?buvid=$session&device=wap&ep_id=$episode_id&platform=web&qn=64&s_locale=en_US&tf=0&timezone=GMT%2B07&type=0" > "$tmp"
 
+    # Get the video url, but the video won't have any audio yet.
     video_url=`sed 's/480P.*$//;s/^.*720P.*\"url\"//' "$tmp" \
         | cut -d\" -f 2 \
         | sed 's/\\\u0026/\&/g'`
 
+    # Get the audio url
     audio_url=`sed 's/^.*\"audio_resource\"//;s/^.*30216.*\"url\"//' "$tmp" \
         | cut -d\" -f 2 \
         | sed 's/\\\u0026/\&/g'`
 
+    # Get the subtitle url
     curl -s "https://api.bilibili.tv/intl/gateway/web/v2/subtitle?buvid=$session&episode_id=$episode_id&platform=web&s_locale=en_US&timezone=GMT%2B07" > "$tmp"
-
-    sub_url=`sed 's/\"English\",.*$//;s/^.*\"url\"//' "$tmp" \
+    sub_url=`sed "s/\"$sub_opt\",.*$//;s/^.*\"url\"//" "$tmp" \
         | cut -d\" -f 2`
 
-    curl -s "$sub_url" > "$sub_tmp"
+    # Get the actual subtitle and write them to .bstation-cli.tmp
+    curl -s "$sub_url" > "$tmp"
 
+    # Convert the acquired subtitle to .srt
     echo "Converting subtitle..."
     rm -f "$sub_path"; convert_sub
-    echo "Playing..."
-    mpv "$video_url" --audio-file="$audio_url" --sub-file="$sub_path" --sub-font-size=32 > /dev/null 2>&1 
+
+    # Play the episode
+    echo "Currently playing $title episode ${selected_ep}/${total_ep}..."
+    setsid -f mpv "$video_url" --audio-file="$audio_url" --sub-file="$sub_path" --sub-font-size=32 > /dev/null 2>&1 
 }
 
 ######
-# MAIN
+# Main
 ######
 
-get_session
+main() {
+    # This function will ask the user for search query,
+    # call the search_anime fucntion,
+    # display the search results,
+    # asks the user to select a title,
+    # gets its episode list using python + selenium webdriver
+    # and finally run the get_episode procedure.
 
-tmp_query=""
-echo -n "Search Anime: "
-read tmp_query
-echo $tmp_query > "$tmp"
-query=`sed 's/\ /\+/g' "$tmp"`
+    # I made these steps to a procedure to make possible the "search for another anime" option in main loop.
 
-search_anime
+    title_num=1
+    list_num=1
+    selected_anime=0
+    tmp_query=""
+    echo -n "Search Anime: "
+    read tmp_query
+    echo $tmp_query > "$tmp"
+    query=`sed 's/\ /\+/g' "$tmp"`
 
-title_num=1
-list_num=1
-selected_anime=0
-title=`sed -n ${title_num}p "$tmp"`
+    search_anime
 
-if [ -z "$title" ]; then
-    echo "No result."
-else
-    while [ -n "$title" ]; do
-        echo -n "[$list_num] "
-        sed -n ${title_num}p "$tmp" | cut -d\" -f 4 | sed 's/^\ *//'
-        list_num=$(( list_num += 1 ))
-        title_num=$(( title_num += 2 ))
-        title=`sed -n ${title_num}p "$tmp"`
-    done
+    title=`sed -n ${title_num}p "$tmp"`
+
+    if [ -z "$title" ]; then
+        echo "No result."
+        sleep 1s; exit
+    else
+        while [ -n "$title" ]; do
+            echo -n "[$list_num] "
+            sed -n ${title_num}p "$tmp" | cut -d\" -f 4 | sed 's/^\ *//;s/\\u0026 //g'
+            list_num=$(( list_num + 1 ))
+            title_num=$(( title_num + 2 ))
+            title=`sed -n ${title_num}p "$tmp"`
+        done
+    fi
     
     echo -n "Enter number: "
     read selected_anime
     if [ $selected_anime -gt 0 ] && [ $selected_anime -lt $list_num ]; then
-        selected_anime=$(( selected_anime *= 2 ))
+        selected_anime=$(( selected_anime * 2 ))
         anime_id=`sed -n ${selected_anime}p "$tmp" | cut -d: -f 2 | sed 's/,//'`
+        selected_anime=$(( selected_anime - 1 ))
+        title=`sed -n ${selected_anime}p "$tmp" | cut -d\" -f 4 | sed 's/^\ *//'`
+        choose_sub
         sed "9 s/\".*\"/\"https:\/\/www\.bilibili\.tv\/en\/play\/$anime_id\"/" "script_template.py" > "script.py"
         echo "Getting episode list..."
         python script.py > /dev/null
         grep "^.*active\"><a href=\"/en/play/$anime_id/.*\"\|^.*card\"><a href=\"/en/play/$anime_id/.*\"" "$tmp" \
             | sed "s/^.*\/en\/play\/$anime_id\///;s/\".*$//" > "$ep_tmp"
         get_episode
-        watch_anime
     else
         echo "Invalid number."
+        sleep 1s; exit
     fi
-fi
+}
 
+######
+# Start Up
+######
+
+tput reset
+
+echo "===================="
+echo "=== BSTATION-CLI ==="
+echo "===================="
+echo ""
+
+get_session
+
+playing=1
+title=""
+total_ep=0
+selected_ep=0
+sub_opt=0
+
+main
+
+# This is the main loop.
+while [ $playing -eq 1 ]; do
+    watch_anime
+    echo "[n] Next episode"
+    echo "[p] Previous episode"
+    echo "[s] Select episode"
+    echo "[a] Search for another anime"
+    echo "[q] Quit"
+    echo -n "Enter choice: "
+    read choice
+    case $choice in
+        n)
+            selected_ep=$(( selected_ep + 1 ))
+            [ $selected_ep -gt $total_ep ] && echo "End of anime." && sleep 1s && exit
+            episode_id=`sed -n ${selected_ep}p "$ep_tmp"`
+            ;;
+
+        p)
+            selected_ep=$(( selected_ep - 1 ))
+            [ $selected_ep -le 0 ] && echo "Invalid episode." && sleep 1s && exit
+            episode_id=`sed -n ${selected_ep}p "$ep_tmp"`
+            ;;
+
+        s)
+            get_episode
+            ;;
+
+        a)
+            tput reset
+            main
+            ;;
+
+        q)
+            playing=0
+            ;;
+
+        *)
+            echo "Invalid choice."
+            sleep 1s; exit
+            ;;
+
+    esac
+done
+
+# Removes all trashes.
 rm -f "$tmp"
 rm -f "$sub_tmp"
 rm -f "$sub_path"
