@@ -46,7 +46,6 @@ if len(btns) >= 2:
     f.close()
     f = open(".bstation-cli.tmp", "a")
     for btn in btns[1:]:
-        print(btn.text)
         if btn.text != "PV&More":
             btn.click()
             f.write(driver.page_source)
