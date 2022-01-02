@@ -30,11 +30,7 @@ try:
     section = driver.find_element(By.CLASS_NAME, "swiper-with-auto-pivot.video-episodes__sections")
     btns = section.find_elements(By.CLASS_NAME, "scroll-list__item")
 except:
-    try:
-        series = driver.find_element(By.CLASS_NAME, "swiper-with-auto-pivot.video-episodes__series")
-        btns = []
-    except:
-        btns = driver.find_elements(By.CLASS_NAME, "scroll-list__item")
+    btns = driver.find_elements(By.CLASS_NAME, "scroll-list__item")
 
 # Prepare write target
 f = open(".bstation-cli.tmp", "w")
